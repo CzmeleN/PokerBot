@@ -570,6 +570,51 @@ public:
     }
 };
 
+void playGameRandom(int numGames, bool verbose) {
+    int numPlayers = 5;
+
+    std::vector<int> wallets(numPlayers, 1000);
+    std::random_device rd;
+    std::mt19937 gen(rd());
+
+    for (int game = 0; game < numGames; ++game) {
+        GameState initialState(numPlayers);
+        initialState.wallets = wallets;
+
+        Deck deck;
+        for (auto& hand : initialState.playersHands) {
+            for (int i = 0; i < 5; ++i) {
+                hand.addCard(deck.drawCard());
+            }
+        }
+        initialState.deck = deck;
+
+        while (!initialState.isTerminal()) {
+            auto possibleMoves = initialState.getPossibleMoves();
+            std::uniform_int_distribution<int> dist(0, possibleMoves.size() - 1);
+            int chosenMoveIndex = dist(gen);
+            initialState.applyMove(possibleMoves[chosenMoveIndex]);
+        }
+
+        initialState.updateWallets();
+        wallets = initialState.wallets;
+
+        if (verbose) initialState.print();
+
+        auto winners = initialState.getResult();
+        std::cout << "Game " << game + 1 << " Winners: ";
+        for (int winner : winners) {
+            std::cout << winner << " ";
+        }
+        std::cout << std::endl;
+
+        for (int i = 0; i < numPlayers; ++i) {
+            std::cout << "Player " << i << " wallet: " << wallets[i] << std::endl;
+        }
+    }
+
+}
+
 void playGameBenchmark(int numGames, bool verbose) {
     std::map<HandValue, double> handStrengthWeights = {
         {HIGH_CARD, 0.1}, {PAIR, 0.2}, {TWO_PAIR, 0.3}, {THREE_KIND, 0.4},
@@ -709,6 +754,8 @@ int main(int argc, char* argv[]) {
         playGameBenchmark(NUM_GAMES, verbose);
     } else if (std::string(argv[1]) == "-s") {
         playGameShowdown(NUM_GAMES, verbose);
+    } else if (std::string(argv[1]) == "-r") {
+        playGameRandom(NUM_GAMES, verbose);
     } else {
         std::cerr << "Invalid option: " << argv[1] << std::endl;
         return 1;
