@@ -2,7 +2,9 @@
 
 static const int NUM_GAMES = 100;
 static const int BET_SIZE = 10;
+static const int MAX_BET = 100;
 static const int MCTS_ITERATIONS = 1000;
+static const int NUM_PLAYERS = 5;
 
 enum Suit { HEARTS, DIAMONDS, CLUBS, SPADES };
 enum Rank { TWO = 2, THREE, FOUR, FIVE, SIX, SEVEN, EIGHT, NINE, TEN, JACK, QUEEN, KING, ACE };
@@ -23,9 +25,16 @@ enum ActionType {
 
 enum HandValue { HIGH_CARD, PAIR, TWO_PAIR, THREE_KIND, STRAIGHT, FLUSH, FULL_HOUSE, FOUR_KIND, STRAIGHT_FLUSH, ROYAL_FLUSH };
 
+struct BotParameters { // Dla botów na benchu
+    double drawProbability;
+    double callProbability;
+    double raiseProbability;
+    double foldProbability;
+};
+
 struct Move {
     ActionType action;
-    int amount; //kwota zakładu
+    int amount; // Kwota zakładu
     std::set<int> cardsToDiscard;
 
     Move(ActionType act = DRAW, int amt = 10, std::set<int> discard = {}) : action(act), amount(amt), cardsToDiscard(discard) {}
@@ -178,76 +187,6 @@ struct Hand {
 
 };
 
-//HandValue evaluateHandStrength() const {
-//        std::vector<Suit> suits;
-//        std::vector<Rank> ranks;
-//        std::set<Suit> suits_set;
-//        std::set<Rank> ranks_set;
-//
-//        for (const auto& card : cards) {
-//            suits.push_back(card.suit);
-//            ranks.push_back(card.rank);
-//            suits_set.insert(card.suit);
-//            ranks_set.insert(card.rank);
-//        }
-//
-//        bool straight = ranks_set.size() == 5 ? is_straight(ranks) : false;
-//
-//        if (suits_set.size() == 1 && straight) {
-//            if (ranks_set.find(ACE) != ranks_set.end() && ranks_set.find(TEN) != ranks_set.end()) {
-//                return ROYAL_FLUSH;
-//            }
-//            return STRAIGHT_FLUSH;
-//        }
-//        if (ranks_set.size() == 2) {
-//            int count = std::count(ranks.begin(), ranks.end(), *ranks_set.begin());
-//
-//            if (count == 4 || count == 1) {
-//                return FOUR_KIND;
-//            }
-//            return FULL_HOUSE;
-//        }
-//        if (suits_set.size() == 1) {
-//            return FLUSH;
-//        }
-//        if (straight) {
-//            return STRAIGHT;
-//        }
-//        if (ranks_set.size() == 3) {
-//            int count = std::count(ranks.begin(), ranks.end(), *ranks_set.begin());
-//            
-//            if (count == 3 || count == 1) {
-//                return THREE_KIND;
-//            }
-//            return TWO_PAIR;
-//        }
-//        if (ranks_set.size() == 4) {
-//            return PAIR;
-//        }
-//
-//        return HIGH_CARD; 
-//    }
-//
-//private:
-//    bool is_straight(const std::vector<Rank>& ranks) const {
-//        std::vector<Rank> sorted = ranks;
-//        
-//        std::sort(sorted.begin(), sorted.end());
-//
-//        if (sorted[0] == TWO && sorted[1] == THREE && sorted[2] == FOUR && sorted[3] == FIVE && sorted[4] == ACE) {
-//            return true;
-//        }
-//
-//        for (short i = 0; i < 4; i++) {
-//            if (sorted[i + 1] - sorted[i] != 1) {
-//                return false;
-//            }
-//        }
-//
-//        return true;
-//    }
-
-
 class Deck {
     std::vector<Card> cards;
 public:
@@ -278,11 +217,11 @@ struct GameState {
     Phase phase;
     Deck deck;
 
-    GameState(int numPlayers) : currentPlayer(0), lastRaiser(-1), pot(0), currentBet(BET_SIZE), phase(EXCHANGE) {
-        playersHands.resize(numPlayers);
-        bets.resize(numPlayers, BET_SIZE);
-        activePlayers.resize(numPlayers, true);
-        wallets.resize(numPlayers, NUM_GAMES * BET_SIZE);
+    GameState(int NUM_PLAYERS) : currentPlayer(0), lastRaiser(-1), pot(0), currentBet(BET_SIZE), phase(EXCHANGE) {
+        playersHands.resize(NUM_PLAYERS);
+        bets.resize(NUM_PLAYERS, BET_SIZE);
+        activePlayers.resize(NUM_PLAYERS, true);
+        wallets.resize(NUM_PLAYERS, NUM_GAMES * BET_SIZE);
     }
 
     void print() const {
@@ -331,12 +270,11 @@ struct GameState {
             wallets[currentPlayer] -= BET_SIZE;
             pot += BET_SIZE;
 
-            // Przejście do fazy BIDDING, jeśli obecny gracz jest ostatnim graczem
             if (currentPlayer == playersHands.size() - 1) {
                 phase = BIDDING;
                 return;
             }
-        } else if (move.action == CALL || (move.action == RAISE && currentBet == 100)) {
+        } else if (move.action == CALL || (move.action == RAISE && currentBet == MAX_BET)) {
             int callAmount = currentBet - bets[currentPlayer];
             bets[currentPlayer] += callAmount;
             wallets[currentPlayer] -= callAmount;
@@ -412,7 +350,8 @@ struct GameState {
                 HandEvaluation currentHand = playersHands[i].evaluateHandStrength();
                 if (winners.empty() || currentHand > bestHand) {
                     bestHand = currentHand;
-                    winners = {static_cast<int>(i)};
+                    winners.clear();
+                    winners.push_back(static_cast<int>(i));
                 } else if (currentHand == bestHand) {
                     winners.push_back(static_cast<int>(i));
                 }
@@ -420,25 +359,6 @@ struct GameState {
         }
         return winners;
     }
-
-
-    //std::vector<int> getResult() const {
-    //    int bestHandStrength = 0;
-    //    std::vector<int> winners;
-    //    for (size_t i = 0; i < playersHands.size(); ++i) {
-    //        if (activePlayers[i]) {
-    //            int handStrength = playersHands[i].evaluateHandStrength();
-    //            if (handStrength > bestHandStrength) {
-    //                bestHandStrength = handStrength;
-    //                winners.clear();
-    //                winners.push_back(i);
-    //            } else if (handStrength == bestHandStrength) {
-    //                winners.push_back(i);
-    //            }
-    //        }
-    //    }
-    //    return winners;
-    //}
 
     void updateWallets() {
         auto winners = getResult();
@@ -461,15 +381,16 @@ struct Node {
 
 struct HeuristicParameters {
     double explorationConstant;
-    double drawBias;
+    double drawBiasLow;
+    double drawBiasHigh;
     double callBiasBase;
     double raiseBiasBase;
     double handStrengthWeight;
     double bankrollWeight;
     std::map<HandValue, double> handStrengthWeights;
 
-    HeuristicParameters(double ec, double db, double cb, double rb, double hsw, double bw, std::map<HandValue, double> hswMap)
-        : explorationConstant(ec), drawBias(db), callBiasBase(cb), raiseBiasBase(rb), 
+    HeuristicParameters(double ec, double dbl, double dbh, double cb, double rb, double hsw, double bw, std::map<HandValue, double> hswMap)
+        : explorationConstant(ec), drawBiasLow(dbl), drawBiasHigh(dbh), callBiasBase(cb), raiseBiasBase(rb), 
           handStrengthWeight(hsw), bankrollWeight(bw), handStrengthWeights(hswMap) {}
 };
 
@@ -487,6 +408,11 @@ class MCTS {
     std::mt19937 generator;
 public:
     MCTS(GameState rootState, HeuristicParameters hp) : params(hp), root(new Node(rootState, nullptr, Move())), generator(std::random_device{}()) {}
+
+    void setGameState(const GameState& newState) {
+        delete root;
+        root = new Node(newState, nullptr, Move());
+    }
 
     void runSearch(int iterations) {
         for (int i = 0; i < iterations; ++i) {
@@ -527,14 +453,17 @@ public:
                 HandValue handValue = handEvaluation.value;
 
                 if (moves[i].action == DRAW) {
-                    probability *= params.drawBias;
+                    if (handValue <= THREE_KIND) {
+                        probability *= params.drawBiasLow;
+                    } else {
+                        probability *= params.drawBiasHigh;
+                    }
                 } else if (moves[i].action == CALL) {
                     probability *= params.callBiasBase * (1.0 + params.handStrengthWeights.at(handValue));
                 } else if (moves[i].action == RAISE) {
                     probability *= params.raiseBiasBase * (1.0 + params.handStrengthWeights.at(handValue));
                 }
 
-                // Dodatkowe oceny heurystyczne
                 if (state.phase != EXCHANGE) {
                     probability *= (1.0 + params.handStrengthWeight * handEvaluation.value);
                 }
@@ -551,7 +480,6 @@ public:
         }
         return state.getResult();
     }
-
 
     void backpropagate(Node* node, const std::vector<int>& result) {
         while (node != nullptr) {
@@ -570,17 +498,31 @@ public:
     }
 };
 
-void playGameRandom(int numGames, bool verbose) {
-    int numPlayers = 5;
-    numGames *= 10;
+void randomizeBotPositions(std::vector<int>& positions) {
+    std::random_device rd;
+    std::mt19937 g(rd());
+    std::shuffle(positions.begin(), positions.end(), g);
+}
 
-    std::vector<int> wallets(numPlayers, 10000);
+void playGameRandom(int numGames, bool verbose) {
+    numGames *= 100;
+
+    std::vector<int> wallets(NUM_PLAYERS, numGames * MAX_BET);
     std::random_device rd;
     std::mt19937 gen(rd());
+    int max = 0, max_cash = -1;
+    std::vector<int> botPositions = {0, 1, 2, 3, 4};
 
     for (int game = 0; game < numGames; ++game) {
-        GameState initialState(numPlayers);
-        initialState.wallets = wallets;
+        randomizeBotPositions(botPositions);
+
+        std::vector<int> permutedWallets(NUM_PLAYERS);
+        for (int i = 0; i < NUM_PLAYERS; ++i) {
+            permutedWallets[i] = wallets[botPositions[i]];
+        }
+
+        GameState initialState(NUM_PLAYERS);
+        initialState.wallets = permutedWallets;
 
         Deck deck;
         for (auto& hand : initialState.playersHands) {
@@ -598,40 +540,164 @@ void playGameRandom(int numGames, bool verbose) {
         }
 
         initialState.updateWallets();
-        wallets = initialState.wallets;
+        for (int i = 0; i < NUM_PLAYERS; ++i) {
+            wallets[botPositions[i]] = initialState.wallets[i];
+        }
 
         if (verbose) initialState.print();
 
         auto winners = initialState.getResult();
-        std::cout << "Game " << game + 1 << " Winners: ";
+        std::cout << std::endl << "󰠰 Game " << game + 1 << " 󰡶 Winners: ";
         for (int winner : winners) {
             std::cout << winner << " ";
         }
         std::cout << std::endl;
 
-        for (int i = 0; i < numPlayers; ++i) {
-            std::cout << "Player " << i << " wallet: " << wallets[i] << std::endl;
+        for (int i = 0; i < NUM_PLAYERS; ++i) {
+            std::cout << "Player 󱚟 " << i + 1 << " (Position " << botPositions[i] + 1 << ") wallet: " << wallets[i] << " 󰄔 " << std::endl;
         }
+    }
+
+    for (int i = 0; i < NUM_PLAYERS; ++i) {
+        if (wallets[i] > max_cash) {
+            max = i;
+            max_cash = wallets[i];
+        }
+    }
+
+    std::cout << std::endl << " Overall winner: Player 󱚟 " << max + 1 << std::endl;
+}
+
+Move getRandomMove(const GameState& state, const BotParameters& params, std::mt19937& gen) { // Dla losowych botów
+    auto possibleMoves = state.getPossibleMoves();
+    std::vector<double> moveProbabilities(possibleMoves.size(), 1.0);
+    
+    for (size_t i = 0; i < possibleMoves.size(); ++i) {
+        switch (possibleMoves[i].action) {
+            case DRAW:
+                moveProbabilities[i] *= params.drawProbability;
+                break;
+            case CALL:
+                moveProbabilities[i] *= params.callProbability;
+                break;
+            case RAISE:
+                moveProbabilities[i] *= params.raiseProbability;
+                break;
+            case FOLD:
+                moveProbabilities[i] *= params.foldProbability;
+                break;
+        }
+    }
+
+    std::discrete_distribution<int> dist(moveProbabilities.begin(), moveProbabilities.end());
+    int chosenMoveIndex = dist(gen);
+    return possibleMoves[chosenMoveIndex];
+}
+
+void playGameBenchmark(int numGames, bool verbose, const std::vector<HeuristicParameters>& agentsParams) {
+    std::vector<MCTS> mctsBots;
+    std::vector<double> fide;
+
+    std::vector<BotParameters> botParams = {
+        {0.4, 0.3, 0.2, 0.1}, 
+        {0.3, 0.4, 0.2, 0.1}, 
+        {0.2, 0.3, 0.4, 0.1}, 
+        {0.1, 0.3, 0.3, 0.3}  
+    };
+
+    for (int i = 0; i < NUM_PLAYERS; ++i) {
+        GameState initialState(NUM_PLAYERS);
+        mctsBots.emplace_back(initialState, agentsParams[i]);
+    }
+
+    for (int id = 0; id < mctsBots.size(); ++id) {
+        MCTS mctsBot = mctsBots[id];
+        std::vector<int> wallets(NUM_PLAYERS, numGames * MAX_BET);
+        std::vector<int> botPositions = {0, 1, 2, 3, 4};
+        std::random_device rd;
+        std::mt19937 gen(rd());
+
+        for (int game = 0; game < numGames; ++game) {
+            randomizeBotPositions(botPositions);
+            std::vector<int> permutedWallets(NUM_PLAYERS);
+            for (int i = 0; i < NUM_PLAYERS; ++i) {
+                permutedWallets[i] = wallets[botPositions[i]];
+            }
+            GameState initialState(NUM_PLAYERS);
+            initialState.wallets = permutedWallets;
+
+            Deck deck;
+            for (auto& hand : initialState.playersHands) {
+                for (int i = 0; i < 5; ++i) {
+                    hand.addCard(deck.drawCard());
+                }
+            }
+            initialState.deck = deck;
+
+            mctsBot.setGameState(initialState);
+
+            while (!initialState.isTerminal()) {
+                int currentPlayer = initialState.getCurrentPlayer();
+                if (botPositions[currentPlayer] == 0) {
+                    mctsBot.setGameState(initialState);
+                    mctsBot.runSearch(MCTS_ITERATIONS);
+                    Move bestMove = mctsBot.getBestMove();
+                    initialState.applyMove(bestMove);
+                } else {
+                    int botIndex = botPositions[currentPlayer] - 1;
+                    Move randomMove = getRandomMove(initialState, botParams[botIndex], gen);
+                    initialState.applyMove(randomMove);
+                }
+            }
+
+            initialState.updateWallets();
+            for (int i = 0; i < NUM_PLAYERS; ++i) {
+                wallets[botPositions[i]] = initialState.wallets[i];
+            }
+
+            if (verbose) initialState.print();
+
+            auto winners = initialState.getResult();
+            std::cout << std::endl << "󰠰 Game " << game + 1 << " 󰡶 Winners: ";
+            for (int winner : winners) {
+                std::cout << winner << " ";
+            }
+            std::cout << std::endl;
+            std::cout << "Agent 󱚝 A" << id + 1 << " (Position " << botPositions[0] + 1 << ") wallet: " << wallets[0] << " 󰄔 " << std::endl;
+
+            for (int i = 1; i < NUM_PLAYERS; ++i) {
+                std::cout << "Bot  " << i << " (Position " << botPositions[i] + 1 << " wallet: " << wallets[i] << " 󰄔 " << std::endl;
+            }
+        }
+        fide.push_back(((double)wallets[0] / ((double)numGames * (double)MAX_BET)));
+    }
+    std::cout << std::endl << "Fide results: " << std::endl;
+
+    for (int i = 0; i < mctsBots.size(); i++) {
+        std::cout << "Agent 󱚝 A" << i + 1 << " Fide: " << fide[i] << "󱦹" << std::endl;
     }
 }
 
-void playGameBenchmark(int numGames, bool verbose) {
-    std::map<HandValue, double> handStrengthWeights = {
-        {HIGH_CARD, 0.1}, {PAIR, 0.2}, {TWO_PAIR, 0.3}, {THREE_KIND, 0.4},
-        {STRAIGHT, 0.5}, {FLUSH, 0.6}, {FULL_HOUSE, 0.7}, {FOUR_KIND, 0.8},
-        {STRAIGHT_FLUSH, 0.9}, {ROYAL_FLUSH, 1.0}
-    };
+void playGameShowdown(int numGames, bool verbose, const std::vector<HeuristicParameters>& agentsParams) {
+    std::vector<int> wallets(NUM_PLAYERS, numGames * MAX_BET);
+    int max = 0, max_cash = -1;
+    std::vector<MCTS> mctsBots;
 
-    HeuristicParameters params(1.41, 1.0, 1.0, 1.0, 0.1, 0.1, handStrengthWeights);
-    int numPlayers = 5;
+    for (int i = 0; i < NUM_PLAYERS; ++i) {
+        GameState initialState(NUM_PLAYERS);
+        mctsBots.emplace_back(initialState, agentsParams[i]);
+    }
 
-    std::vector<int> wallets(numPlayers, 1000);
-    std::random_device rd;
-    std::mt19937 gen(rd());
+    std::vector<int> botPositions = {0, 1, 2, 3, 4};
 
     for (int game = 0; game < numGames; ++game) {
-        GameState initialState(numPlayers);
-        initialState.wallets = wallets;
+        randomizeBotPositions(botPositions);
+        std::vector<int> permutedWallets(NUM_PLAYERS);
+        for (int i = 0; i < NUM_PLAYERS; ++i) {
+            permutedWallets[i] = wallets[botPositions[i]];
+        }
+        GameState initialState(NUM_PLAYERS);
+        initialState.wallets = permutedWallets;
 
         Deck deck;
         for (auto& hand : initialState.playersHands) {
@@ -641,102 +707,96 @@ void playGameBenchmark(int numGames, bool verbose) {
         }
         initialState.deck = deck;
 
-        MCTS mcts(initialState, params);
-
-        while (!initialState.isTerminal()) {
-            if (initialState.getCurrentPlayer() == 0) {
-                MCTS mcts(initialState, params);
-                mcts.runSearch(MCTS_ITERATIONS);
-                Move bestMove = mcts.getBestMove();
-                initialState.applyMove(bestMove);
-            } else {
-                auto possibleMoves = initialState.getPossibleMoves();
-                std::uniform_int_distribution<int> dist(0, possibleMoves.size() - 1);
-                int chosenMoveIndex = dist(gen);
-                initialState.applyMove(possibleMoves[chosenMoveIndex]);
-            }
-        }
-
-        initialState.updateWallets();
-        wallets = initialState.wallets;
-
-        if (verbose) initialState.print();
-
-        auto winners = initialState.getResult();
-        std::cout << "Game " << game + 1 << " Winners: ";
-        for (int winner : winners) {
-            std::cout << winner << " ";
-        }
-        std::cout << std::endl;
-
-        for (int i = 0; i < numPlayers; ++i) {
-            std::cout << "Player " << i << " wallet: " << wallets[i] << std::endl;
-        }
-    }
-}
-
-void playGameShowdown(int numGames, bool verbose) {
-    std::map<HandValue, double> handStrengthWeights = {
-        {HIGH_CARD, 0.1}, {PAIR, 0.2}, {TWO_PAIR, 0.3}, {THREE_KIND, 0.4},
-        {STRAIGHT, 0.5}, {FLUSH, 0.6}, {FULL_HOUSE, 0.7}, {FOUR_KIND, 0.8},
-        {STRAIGHT_FLUSH, 0.9}, {ROYAL_FLUSH, 1.0}
-    };
-
-    HeuristicParameters params(1.41, 1.0, 1.0, 1.0, 0.1, 0.1, handStrengthWeights);
-    int numPlayers = 5;
-
-    std::vector<int> wallets(numPlayers, 1000);
-    for (int game = 0; game < numGames; ++game) {
-        GameState initialState(numPlayers);
-        initialState.wallets = wallets;
-
-        Deck deck;
-        for (auto& hand : initialState.playersHands) {
-            for (int i = 0; i < 5; ++i) {
-                hand.addCard(deck.drawCard());
-            }
-        }
-        initialState.deck = deck;
-
-        std::vector<MCTS> mctsBots;
-        for (int i = 0; i < numPlayers; ++i) {
-            GameState botState = initialState; // Tworzenie kopii stanu dla każdego bota
-            mctsBots.emplace_back(botState, params);
+        for (int i = 0; i < NUM_PLAYERS; ++i) {
+            mctsBots[i].setGameState(initialState);
         }
 
         while (!initialState.isTerminal()) {
             int currentPlayer = initialState.getCurrentPlayer();
-            GameState simulationState = initialState; // Tworzenie kopii stanu dla symulacji
-            mctsBots[currentPlayer] = MCTS(simulationState, params);
-            mctsBots[currentPlayer].runSearch(MCTS_ITERATIONS);
-            Move bestMove = mctsBots[currentPlayer].getBestMove();
+            GameState simulationState = initialState;
+            mctsBots[botPositions[currentPlayer]].setGameState(simulationState);
+            mctsBots[botPositions[currentPlayer]].runSearch(MCTS_ITERATIONS);
+            Move bestMove = mctsBots[botPositions[currentPlayer]].getBestMove();
             initialState.applyMove(bestMove);
-
-            // Debugging output
         }
 
         initialState.updateWallets();
-        wallets = initialState.wallets;
-        
+        for (int i = 0; i < NUM_PLAYERS; ++i) {
+            wallets[botPositions[i]] = initialState.wallets[i];
+        }
+
         if (verbose) initialState.print();
 
-
         auto winners = initialState.getResult();
-        std::cout << "Game " << game + 1 << " Winners: ";
+        std::cout << std::endl << "󰠰 Game " << game + 1 << " 󰡶 Winners: ";
         for (int winner : winners) {
             std::cout << winner << " ";
         }
         std::cout << std::endl;
 
-        for (int i = 0; i < numPlayers; ++i) {
-            std::cout << "Player " << i << " wallet: " << wallets[i] << std::endl;
+        for (int i = 0; i < NUM_PLAYERS; ++i) {
+            std::cout << "Agent 󱚝 A" << i + 1 << " (Position " << botPositions[i] + 1 << ") wallet: " << wallets[i] << " 󰄔 " << std::endl;
         }
     }
+
+    for (int i = 0; i < NUM_PLAYERS; ++i) {
+        if (wallets[i] > max_cash) {
+            max = i;
+            max_cash = wallets[i];
+        }
+    }
+
+    std::cout << std::endl << " Overall winner: Agent 󱚝 A" << max + 1 << std::endl;
+}
+
+HeuristicParameters readParams(std::ifstream& file) {
+    double ec, dbl, dbh, cb, rb, hsw, bw;
+    std::map<HandValue, double> hswMap;
+    std::string line, key;
+
+    std::getline(file, line); // Ignorowanie nazwy agenta
+
+    while (std::getline(file, line) && !line.empty()) {
+        std::istringstream iss(line);
+        iss >> key;
+        if (key == "explorationConstant") {
+            iss >> ec;
+        } else if (key == "drawBiasLow") {
+            iss >> dbl;
+        } else if (key == "drawBiasHigh") {
+            iss >> dbh;
+        } else if (key == "callBiasBase") {
+            iss >> cb;
+        } else if (key == "raiseBiasBase") {
+            iss >> rb;
+        } else if (key == "handStrengthWeight") {
+            iss >> hsw;
+        } else if (key == "bankrollWeight") {
+            iss >> bw;
+        } else if (key == "handStrengthWeights") {
+            std::string hand;
+            double weight;
+            while (iss >> hand >> weight) {
+                if (hand == "HIGH_CARD") hswMap[HIGH_CARD] = weight;
+                else if (hand == "PAIR") hswMap[PAIR] = weight;
+                else if (hand == "TWO_PAIR") hswMap[TWO_PAIR] = weight;
+                else if (hand == "THREE_KIND") hswMap[THREE_KIND] = weight;
+                else if (hand == "STRAIGHT") hswMap[STRAIGHT] = weight;
+                else if (hand == "FLUSH") hswMap[FLUSH] = weight;
+                else if (hand == "FULL_HOUSE") hswMap[FULL_HOUSE] = weight;
+                else if (hand == "FOUR_KIND") hswMap[FOUR_KIND] = weight;
+                else if (hand == "STRAIGHT_FLUSH") hswMap[STRAIGHT_FLUSH] = weight;
+                else if (hand == "ROYAL_FLUSH") hswMap[ROYAL_FLUSH] = weight;
+            }
+        }
+    }
+
+    return HeuristicParameters(ec, dbl, dbh, cb, rb, hsw, bw, hswMap);
 }
 
 int main(int argc, char* argv[]) {
     if (argc < 2 || argc > 3) {
-        std::cerr << "Usage: " << argv[0] << " -b|-s [-v]" << std::endl;
+        std::cerr << "Usage: " << argv[0] << " -b|-s|-r [-v]" << std::endl;
         return 1;
     }
 
@@ -750,10 +810,26 @@ int main(int argc, char* argv[]) {
         }
     }
 
+    std::ifstream file("params.bots");
+    if (!file.is_open()) {
+        std::cerr << "Could not open params.bots file" << std::endl;
+        return 1;
+    }
+
+    std::vector<HeuristicParameters> agentsParams;
+    for (int i = 0; i < NUM_PLAYERS; ++i) {
+        if (file.eof()) {
+            std::cerr << "Not enough parameters in params.bots file" << std::endl;
+            return 1;
+        }
+        agentsParams.push_back(readParams(file));
+    }
+    file.close();
+
     if (std::string(argv[1]) == "-b") {
-        playGameBenchmark(NUM_GAMES, verbose);
+        playGameBenchmark(NUM_GAMES, verbose, agentsParams);
     } else if (std::string(argv[1]) == "-s") {
-        playGameShowdown(NUM_GAMES, verbose);
+        playGameShowdown(NUM_GAMES, verbose, agentsParams);
     } else if (std::string(argv[1]) == "-r") {
         playGameRandom(NUM_GAMES, verbose);
     } else {
