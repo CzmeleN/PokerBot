@@ -140,7 +140,7 @@ struct GameState {
         playersHands.resize(numPlayers);
         bets.resize(numPlayers, BET_SIZE);
         activePlayers.resize(numPlayers, true);
-        wallets.resize(numPlayers, 1000);
+        wallets.resize(numPlayers, NUM_GAMES * BET_SIZE);
     }
 
     void print() const {
@@ -245,7 +245,6 @@ struct GameState {
         std::vector<Move> possibleMoves;
 
         if (phase == EXCHANGE) {
-            // Generowanie możliwych ruchów wymiany kart
             for (int i = 0; i < (1 << 5); ++i) {
                 std::set<int> cardsToDiscard;
                 for (int j = 0; j < 5; ++j) {
@@ -253,14 +252,13 @@ struct GameState {
                         cardsToDiscard.insert(j);
                     }
                 }
-                possibleMoves.push_back(Move(DRAW, 10, cardsToDiscard));
+                possibleMoves.push_back(Move(DRAW, 0, cardsToDiscard));
             }
         } else if (phase == BIDDING) {
-            // Generowanie możliwych ruchów licytacji
             if (bets[currentPlayer] <= currentBet) {
                 possibleMoves.push_back(Move(CALL));
             }
-            possibleMoves.push_back(Move(RAISE, BET_SIZE)); // Przykładowa wartość podbicia
+            possibleMoves.push_back(Move(RAISE, BET_SIZE));
             possibleMoves.push_back(Move(FOLD));
         }
 
@@ -423,8 +421,7 @@ public:
     }
 };
 
-void playGame(int numGames) {
-    // Przykładowe ustawienie wag dla różnych sił rąk
+void playGameBenchmark(int numGames) {
     std::map<HandValue, double> handStrengthWeights = {
         {HIGH_CARD, 0.1}, {PAIR, 0.2}, {TWO_PAIR, 0.3}, {THREE_KIND, 0.4},
         {STRAIGHT, 0.5}, {FLUSH, 0.6}, {FULL_HOUSE, 0.7}, {FOUR_KIND, 0.8},
@@ -463,8 +460,6 @@ void playGame(int numGames) {
                 int chosenMoveIndex = dist(gen);
                 initialState.applyMove(possibleMoves[chosenMoveIndex]);
             }
-            // Potem będzie jako opcja -v
-            // initialState.print();
         }
 
         initialState.updateWallets();
@@ -483,8 +478,79 @@ void playGame(int numGames) {
     }
 }
 
-int main() {
-    playGame(NUM_GAMES);
-    return 0;
+void playGameVersus(int numGames) {
+    std::map<HandValue, double> handStrengthWeights = {
+        {HIGH_CARD, 0.1}, {PAIR, 0.2}, {TWO_PAIR, 0.3}, {THREE_KIND, 0.4},
+        {STRAIGHT, 0.5}, {FLUSH, 0.6}, {FULL_HOUSE, 0.7}, {FOUR_KIND, 0.8},
+        {STRAIGHT_FLUSH, 0.9}, {ROYAL_FLUSH, 1.0}
+    };
+
+    HeuristicParameters params(1.41, 1.0, 1.0, 1.0, 0.1, 0.1, handStrengthWeights);
+    int numPlayers = 5;
+
+    std::vector<int> wallets(numPlayers, 1000);
+    for (int game = 0; game < numGames; ++game) {
+        GameState initialState(numPlayers);
+        initialState.wallets = wallets;
+
+        Deck deck;
+        for (auto& hand : initialState.playersHands) {
+            for (int i = 0; i < 5; ++i) {
+                hand.addCard(deck.drawCard());
+            }
+        }
+        initialState.deck = deck;
+
+        std::vector<MCTS> mctsBots;
+        for (int i = 0; i < numPlayers; ++i) {
+            GameState botState = initialState; // Tworzenie kopii stanu dla każdego bota
+            mctsBots.emplace_back(botState, params);
+        }
+
+        while (!initialState.isTerminal()) {
+            int currentPlayer = initialState.getCurrentPlayer();
+            GameState simulationState = initialState; // Tworzenie kopii stanu dla symulacji
+            mctsBots[currentPlayer] = MCTS(simulationState, params);
+            mctsBots[currentPlayer].runSearch(MCTS_ITERATIONS);
+            Move bestMove = mctsBots[currentPlayer].getBestMove();
+            initialState.applyMove(bestMove);
+
+            // Debugging output
+            //initialState.print();
+        }
+
+        initialState.updateWallets();
+        wallets = initialState.wallets;
+
+        auto winners = initialState.getResult();
+        std::cout << "Game " << game + 1 << " Winners: ";
+        for (int winner : winners) {
+            std::cout << winner << " ";
+        }
+        std::cout << std::endl;
+
+        for (int i = 0; i < numPlayers; ++i) {
+            std::cout << "Player " << i << " wallet: " << wallets[i] << std::endl;
+        }
+    }
 }
 
+int main(int argc, char* argv[]) {
+    srand(static_cast<unsigned int>(time(nullptr))); // Ustawienie ziarna dla rand()
+
+    if (argc != 2) {
+        std::cerr << "Usage: " << argv[0] << " -benchmark|-versus" << std::endl;
+        return 1;
+    }
+
+    if (std::string(argv[1]) == "-benchmark") {
+        playGameBenchmark(NUM_GAMES);
+    } else if (std::string(argv[1]) == "-versus") {
+        playGameVersus(NUM_GAMES);
+    } else {
+        std::cerr << "Invalid option: " << argv[1] << std::endl;
+        return 1;
+    }
+
+    return 0;
+}
