@@ -31,81 +31,222 @@ struct Move {
     Move(ActionType act = DRAW, int amt = 10, std::set<int> discard = {}) : action(act), amount(amt), cardsToDiscard(discard) {}
 };
 
+struct HandEvaluation {
+    HandValue value;
+    std::vector<Rank> ranks; 
+
+    HandEvaluation(HandValue v, std::vector<Rank> r) : value(v), ranks(r) {}
+
+    bool operator<(const HandEvaluation& other) const {
+        if (value != other.value)
+            return value < other.value;
+
+        for (size_t i = 0; i < ranks.size() && i < other.ranks.size(); ++i) {
+            if (ranks[i] != other.ranks[i])
+                return ranks[i] < other.ranks[i];
+        }
+        return false;
+    }
+
+    bool operator>(const HandEvaluation& other) const {
+        return other < *this;
+    }
+
+    bool operator==(const HandEvaluation& other) const {
+        return value == other.value && ranks == other.ranks;
+    }
+};
+
 struct Hand {
     std::vector<Card> cards;
     void addCard(const Card& card) {
         cards.push_back(card);
     }
-
-    HandValue evaluateHandStrength() const {
+    HandEvaluation evaluateHandStrength() const {
         std::vector<Suit> suits;
         std::vector<Rank> ranks;
-        std::set<Suit> suits_set;
-        std::set<Rank> ranks_set;
+        std::map<Rank, int> rankCount;
+        std::map<Suit, int> suitCount;
 
         for (const auto& card : cards) {
             suits.push_back(card.suit);
             ranks.push_back(card.rank);
-            suits_set.insert(card.suit);
-            ranks_set.insert(card.rank);
+            rankCount[card.rank]++;
+            suitCount[card.suit]++;
         }
 
-        bool straight = ranks_set.size() == 5 ? is_straight(ranks) : false;
+        std::sort(ranks.begin(), ranks.end(), std::greater<Rank>());
 
-        if (suits_set.size() == 1 && straight) {
-            if (ranks_set.find(ACE) != ranks_set.end() && ranks_set.find(TEN) != ranks_set.end()) {
-                return ROYAL_FLUSH;
+        bool isFlush = false;
+        for (const auto& suit : suitCount) {
+            if (suit.second == 5) {
+                isFlush = true;
+                break;
             }
-            return STRAIGHT_FLUSH;
-        }
-        if (ranks_set.size() == 2) {
-            int count = std::count(ranks.begin(), ranks.end(), *ranks_set.begin());
-
-            if (count == 4 || count == 1) {
-                return FOUR_KIND;
-            }
-            return FULL_HOUSE;
-        }
-        if (suits_set.size() == 1) {
-            return FLUSH;
-        }
-        if (straight) {
-            return STRAIGHT;
-        }
-        if (ranks_set.size() == 3) {
-            int count = std::count(ranks.begin(), ranks.end(), *ranks_set.begin());
-            
-            if (count == 3 || count == 1) {
-                return THREE_KIND;
-            }
-            return TWO_PAIR;
-        }
-        if (ranks_set.size() == 4) {
-            return PAIR;
         }
 
-        return HIGH_CARD; 
+        bool isStraight = false;
+        if (rankCount.size() == 5 && (ranks[0] - ranks[4] == 4 || (ranks[0] == ACE && ranks[1] == FIVE))) {
+            isStraight = true;
+        }
+
+        if (isFlush && isStraight) {
+            if (ranks[0] == ACE && ranks[1] == KING) {
+                return HandEvaluation(ROYAL_FLUSH, ranks);
+            }
+            return HandEvaluation(STRAIGHT_FLUSH, ranks);
+        }
+
+        for (const auto& rank : rankCount) {
+            if (rank.second == 4) {
+                std::vector<Rank> sortedRanks = {rank.first};
+                for (const auto& r : ranks) {
+                    if (r != rank.first) {
+                        sortedRanks.push_back(r);
+                    }
+                }
+                return HandEvaluation(FOUR_KIND, sortedRanks);
+            }
+        }
+
+        bool hasThree = false;
+        bool hasPair = false;
+        Rank threeRank, pairRank;
+        for (const auto& rank : rankCount) {
+            if (rank.second == 3) {
+                hasThree = true;
+                threeRank = rank.first;
+            }
+            if (rank.second == 2) {
+                hasPair = true;
+                pairRank = rank.first;
+            }
+        }
+
+        if (hasThree && hasPair) {
+            return HandEvaluation(FULL_HOUSE, {threeRank, pairRank});
+        }
+
+        if (isFlush) {
+            return HandEvaluation(FLUSH, ranks);
+        }
+
+        if (isStraight) {
+            return HandEvaluation(STRAIGHT, ranks);
+        }
+
+        if (hasThree) {
+            std::vector<Rank> sortedRanks = {threeRank};
+            for (const auto& r : ranks) {
+                if (r != threeRank) {
+                    sortedRanks.push_back(r);
+                }
+            }
+            return HandEvaluation(THREE_KIND, sortedRanks);
+        }
+
+        std::vector<Rank> pairs;
+        for (const auto& rank : rankCount) {
+            if (rank.second == 2) {
+                pairs.push_back(rank.first);
+            }
+        }
+
+        if (pairs.size() == 2) {
+            std::sort(pairs.begin(), pairs.end(), std::greater<Rank>());
+            std::vector<Rank> sortedRanks = pairs;
+            for (const auto& r : ranks) {
+                if (std::find(pairs.begin(), pairs.end(), r) == pairs.end()) {
+                    sortedRanks.push_back(r);
+                }
+            }
+            return HandEvaluation(TWO_PAIR, sortedRanks);
+        }
+
+        if (pairs.size() == 1) {
+            std::vector<Rank> sortedRanks = {pairs[0]};
+            for (const auto& r : ranks) {
+                if (r != pairs[0]) {
+                    sortedRanks.push_back(r);
+                }
+            }
+            return HandEvaluation(PAIR, sortedRanks);
+        }
+
+        return HandEvaluation(HIGH_CARD, ranks);
     }
 
-private:
-    bool is_straight(const std::vector<Rank>& ranks) const {
-        std::vector<Rank> sorted = ranks;
-        
-        std::sort(sorted.begin(), sorted.end());
-
-        if (sorted[0] == TWO && sorted[1] == THREE && sorted[2] == FOUR && sorted[3] == FIVE && sorted[4] == ACE) {
-            return true;
-        }
-
-        for (short i = 0; i < 4; i++) {
-            if (sorted[i + 1] - sorted[i] != 1) {
-                return false;
-            }
-        }
-
-        return true;
-    }
 };
+
+//HandValue evaluateHandStrength() const {
+//        std::vector<Suit> suits;
+//        std::vector<Rank> ranks;
+//        std::set<Suit> suits_set;
+//        std::set<Rank> ranks_set;
+//
+//        for (const auto& card : cards) {
+//            suits.push_back(card.suit);
+//            ranks.push_back(card.rank);
+//            suits_set.insert(card.suit);
+//            ranks_set.insert(card.rank);
+//        }
+//
+//        bool straight = ranks_set.size() == 5 ? is_straight(ranks) : false;
+//
+//        if (suits_set.size() == 1 && straight) {
+//            if (ranks_set.find(ACE) != ranks_set.end() && ranks_set.find(TEN) != ranks_set.end()) {
+//                return ROYAL_FLUSH;
+//            }
+//            return STRAIGHT_FLUSH;
+//        }
+//        if (ranks_set.size() == 2) {
+//            int count = std::count(ranks.begin(), ranks.end(), *ranks_set.begin());
+//
+//            if (count == 4 || count == 1) {
+//                return FOUR_KIND;
+//            }
+//            return FULL_HOUSE;
+//        }
+//        if (suits_set.size() == 1) {
+//            return FLUSH;
+//        }
+//        if (straight) {
+//            return STRAIGHT;
+//        }
+//        if (ranks_set.size() == 3) {
+//            int count = std::count(ranks.begin(), ranks.end(), *ranks_set.begin());
+//            
+//            if (count == 3 || count == 1) {
+//                return THREE_KIND;
+//            }
+//            return TWO_PAIR;
+//        }
+//        if (ranks_set.size() == 4) {
+//            return PAIR;
+//        }
+//
+//        return HIGH_CARD; 
+//    }
+//
+//private:
+//    bool is_straight(const std::vector<Rank>& ranks) const {
+//        std::vector<Rank> sorted = ranks;
+//        
+//        std::sort(sorted.begin(), sorted.end());
+//
+//        if (sorted[0] == TWO && sorted[1] == THREE && sorted[2] == FOUR && sorted[3] == FIVE && sorted[4] == ACE) {
+//            return true;
+//        }
+//
+//        for (short i = 0; i < 4; i++) {
+//            if (sorted[i + 1] - sorted[i] != 1) {
+//                return false;
+//            }
+//        }
+//
+//        return true;
+//    }
+
 
 class Deck {
     std::vector<Card> cards;
@@ -131,12 +272,13 @@ struct GameState {
     std::vector<bool> activePlayers;
     std::vector<int> wallets;
     int currentPlayer;
+    int lastRaiser;
     int pot;
     int currentBet;
     Phase phase;
     Deck deck;
 
-    GameState(int numPlayers) : currentPlayer(0), pot(0), currentBet(BET_SIZE), phase(EXCHANGE) {
+    GameState(int numPlayers) : currentPlayer(0), lastRaiser(-1), pot(0), currentBet(BET_SIZE), phase(EXCHANGE) {
         playersHands.resize(numPlayers);
         bets.resize(numPlayers, BET_SIZE);
         activePlayers.resize(numPlayers, true);
@@ -199,6 +341,9 @@ struct GameState {
             bets[currentPlayer] += callAmount;
             wallets[currentPlayer] -= callAmount;
             pot += callAmount;
+            if (lastRaiser == -1) {
+                lastRaiser = currentPlayer;
+            }
         } else if (move.action == RAISE) {
             int raiseAmount = move.amount;
             int totalBet = currentBet + raiseAmount;
@@ -207,35 +352,30 @@ struct GameState {
             wallets[currentPlayer] -= callAmount;
             pot += callAmount;
             currentBet = totalBet;
+            lastRaiser = currentPlayer;
         } else if (move.action == FOLD) {
             activePlayers[currentPlayer] = false;
         }
         
         // Przejście do następnego gracza
         bool looped = false;
-        int lastPlayer = currentPlayer;
         currentPlayer = (currentPlayer + 1) % playersHands.size();
         while (!activePlayers[currentPlayer]) {
             currentPlayer = (currentPlayer + 1) % playersHands.size();
         }
 
-        if (lastPlayer > currentPlayer) {
+        if (currentPlayer == lastRaiser) {
             looped = true;
         }
 
-        // Sprawdzenie, czy wszyscy aktywni gracze zrównali swoje zakłady lub został tylko jeden aktywny gracz
         if (phase == BIDDING) {
-            bool allBetsEqual = true;
             int activeCount = 0;
             for (size_t i = 0; i < activePlayers.size(); ++i) {
                 if (activePlayers[i]) {
                     activeCount++;
-                    if (bets[i] != currentBet) {
-                        allBetsEqual = false;
-                    }
                 }
             }
-            if ((looped && allBetsEqual) || activeCount <= 1) {
+            if (looped || activeCount <= 1) {
                 phase = SHOWDOWN;
             }
         }
@@ -255,9 +395,7 @@ struct GameState {
                 possibleMoves.push_back(Move(DRAW, 0, cardsToDiscard));
             }
         } else if (phase == BIDDING) {
-            if (bets[currentPlayer] <= currentBet) {
-                possibleMoves.push_back(Move(CALL));
-            }
+            possibleMoves.push_back(Move(CALL));
             possibleMoves.push_back(Move(RAISE, BET_SIZE));
             possibleMoves.push_back(Move(FOLD));
         }
@@ -265,31 +403,42 @@ struct GameState {
         return possibleMoves;
     }
 
-    int evaluate() const {
-        int maxStrength = 0;
-        for (const auto& hand : playersHands) {
-            maxStrength = std::max(maxStrength, (int)hand.evaluateHandStrength());
-        }
-        return maxStrength;
-    }
-
     std::vector<int> getResult() const {
-        int bestHandStrength = 0;
+        HandEvaluation bestHand(HIGH_CARD, {});
         std::vector<int> winners;
+
         for (size_t i = 0; i < playersHands.size(); ++i) {
             if (activePlayers[i]) {
-                int handStrength = playersHands[i].evaluateHandStrength();
-                if (handStrength > bestHandStrength) {
-                    bestHandStrength = handStrength;
-                    winners.clear();
-                    winners.push_back(i);
-                } else if (handStrength == bestHandStrength) {
-                    winners.push_back(i);
+                HandEvaluation currentHand = playersHands[i].evaluateHandStrength();
+                if (winners.empty() || currentHand > bestHand) {
+                    bestHand = currentHand;
+                    winners = {static_cast<int>(i)};
+                } else if (currentHand == bestHand) {
+                    winners.push_back(static_cast<int>(i));
                 }
             }
         }
         return winners;
     }
+
+
+    //std::vector<int> getResult() const {
+    //    int bestHandStrength = 0;
+    //    std::vector<int> winners;
+    //    for (size_t i = 0; i < playersHands.size(); ++i) {
+    //        if (activePlayers[i]) {
+    //            int handStrength = playersHands[i].evaluateHandStrength();
+    //            if (handStrength > bestHandStrength) {
+    //                bestHandStrength = handStrength;
+    //                winners.clear();
+    //                winners.push_back(i);
+    //            } else if (handStrength == bestHandStrength) {
+    //                winners.push_back(i);
+    //            }
+    //        }
+    //    }
+    //    return winners;
+    //}
 
     void updateWallets() {
         auto winners = getResult();
@@ -374,8 +523,8 @@ public:
             std::vector<double> moveProbabilities(moves.size(), 1.0);
             for (size_t i = 0; i < moves.size(); ++i) {
                 double probability = 1.0;
-                double handStrength = state.playersHands[state.getCurrentPlayer()].evaluateHandStrength();
-                HandValue handValue = state.playersHands[state.getCurrentPlayer()].evaluateHandStrength();
+                HandEvaluation handEvaluation = state.playersHands[state.getCurrentPlayer()].evaluateHandStrength();
+                HandValue handValue = handEvaluation.value;
 
                 if (moves[i].action == DRAW) {
                     probability *= params.drawBias;
@@ -387,7 +536,7 @@ public:
 
                 // Dodatkowe oceny heurystyczne
                 if (state.phase != EXCHANGE) {
-                    probability *= (1.0 + params.handStrengthWeight * handStrength);
+                    probability *= (1.0 + params.handStrengthWeight * handEvaluation.value);
                 }
 
                 double bankrollFactor = 1.0 + params.bankrollWeight * state.bets[state.getCurrentPlayer()];
@@ -421,7 +570,7 @@ public:
     }
 };
 
-void playGameBenchmark(int numGames) {
+void playGameBenchmark(int numGames, bool verbose) {
     std::map<HandValue, double> handStrengthWeights = {
         {HIGH_CARD, 0.1}, {PAIR, 0.2}, {TWO_PAIR, 0.3}, {THREE_KIND, 0.4},
         {STRAIGHT, 0.5}, {FLUSH, 0.6}, {FULL_HOUSE, 0.7}, {FOUR_KIND, 0.8},
@@ -432,6 +581,9 @@ void playGameBenchmark(int numGames) {
     int numPlayers = 5;
 
     std::vector<int> wallets(numPlayers, 1000);
+    std::random_device rd;
+    std::mt19937 gen(rd());
+
     for (int game = 0; game < numGames; ++game) {
         GameState initialState(numPlayers);
         initialState.wallets = wallets;
@@ -455,8 +607,6 @@ void playGameBenchmark(int numGames) {
             } else {
                 auto possibleMoves = initialState.getPossibleMoves();
                 std::uniform_int_distribution<int> dist(0, possibleMoves.size() - 1);
-                std::random_device rd;
-                std::mt19937 gen(rd());
                 int chosenMoveIndex = dist(gen);
                 initialState.applyMove(possibleMoves[chosenMoveIndex]);
             }
@@ -464,6 +614,8 @@ void playGameBenchmark(int numGames) {
 
         initialState.updateWallets();
         wallets = initialState.wallets;
+
+        if (verbose) initialState.print();
 
         auto winners = initialState.getResult();
         std::cout << "Game " << game + 1 << " Winners: ";
@@ -478,7 +630,7 @@ void playGameBenchmark(int numGames) {
     }
 }
 
-void playGameVersus(int numGames) {
+void playGameShowdown(int numGames, bool verbose) {
     std::map<HandValue, double> handStrengthWeights = {
         {HIGH_CARD, 0.1}, {PAIR, 0.2}, {TWO_PAIR, 0.3}, {THREE_KIND, 0.4},
         {STRAIGHT, 0.5}, {FLUSH, 0.6}, {FULL_HOUSE, 0.7}, {FOUR_KIND, 0.8},
@@ -516,11 +668,13 @@ void playGameVersus(int numGames) {
             initialState.applyMove(bestMove);
 
             // Debugging output
-            //initialState.print();
         }
 
         initialState.updateWallets();
         wallets = initialState.wallets;
+        
+        if (verbose) initialState.print();
+
 
         auto winners = initialState.getResult();
         std::cout << "Game " << game + 1 << " Winners: ";
@@ -536,17 +690,25 @@ void playGameVersus(int numGames) {
 }
 
 int main(int argc, char* argv[]) {
-    srand(static_cast<unsigned int>(time(nullptr))); // Ustawienie ziarna dla rand()
-
-    if (argc != 2) {
-        std::cerr << "Usage: " << argv[0] << " -benchmark|-versus" << std::endl;
+    if (argc < 2 || argc > 3) {
+        std::cerr << "Usage: " << argv[0] << " -b|-s [-v]" << std::endl;
         return 1;
     }
 
-    if (std::string(argv[1]) == "-benchmark") {
-        playGameBenchmark(NUM_GAMES);
-    } else if (std::string(argv[1]) == "-versus") {
-        playGameVersus(NUM_GAMES);
+    bool verbose = false;
+    if (argc == 3) {
+        if (std::string(argv[2]) == "-v") {
+            verbose = true;
+        } else {
+            std::cerr << "Invalid option: " << argv[2] << std::endl;
+            return 1;
+        }
+    }
+
+    if (std::string(argv[1]) == "-b") {
+        playGameBenchmark(NUM_GAMES, verbose);
+    } else if (std::string(argv[1]) == "-s") {
+        playGameShowdown(NUM_GAMES, verbose);
     } else {
         std::cerr << "Invalid option: " << argv[1] << std::endl;
         return 1;
