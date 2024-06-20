@@ -572,8 +572,9 @@ public:
 
 void playGameRandom(int numGames, bool verbose) {
     int numPlayers = 5;
+    numGames *= 10;
 
-    std::vector<int> wallets(numPlayers, 1000);
+    std::vector<int> wallets(numPlayers, 10000);
     std::random_device rd;
     std::mt19937 gen(rd());
 
@@ -612,7 +613,6 @@ void playGameRandom(int numGames, bool verbose) {
             std::cout << "Player " << i << " wallet: " << wallets[i] << std::endl;
         }
     }
-
 }
 
 void playGameBenchmark(int numGames, bool verbose) {
