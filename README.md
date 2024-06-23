@@ -13,7 +13,7 @@ $ make
 **Run:**
 
 ```sh
-$ ./bot [mode flag] [verbose flag (optional)]
+$ ./bot [mode flag] [verbose flag (optional)] <filename (with agents' parameters)>
 ```
 
 **Modes:**

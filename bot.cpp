@@ -1,6 +1,6 @@
 #include <bits/stdc++.h>
 
-static const int NUM_GAMES = 100;
+static const int NUM_GAMES = 250;
 static const int BET_SIZE = 10;
 static const int MAX_BET = 500;
 static const int CASH_FACTOR = 10;
@@ -849,7 +849,7 @@ std::vector<HeuristicParameters> generateParameterSets() {
 void evaluateParameterSets(int numGames) {
     auto parameterSets = generateParameterSets();
 
-    playGameBenchmark(numGames, false, parameterSets); // Replace "..." with other agents' parameters
+    playGameBenchmark(numGames, false, parameterSets);
 }
 
 void playGameShowdown(int numGames, bool verbose, const std::vector<HeuristicParameters>& agentsParams) {
@@ -963,47 +963,53 @@ HeuristicParameters readParams(std::ifstream& file) {
 }
 
 int main(int argc, char* argv[]) {
-    if (argc < 2 || argc > 3) {
-        std::cerr << "Usage: " << argv[0] << " -b|-s|-r [-v]" << std::endl;
+    if (argc < 3 || argc > 4) {
+        std::cerr << "Usage: " << argv[0] << " -b|-s|-r [-v] <filename>" << std::endl;
         return 1;
     }
 
     bool verbose = false;
-    if (argc == 3) {
+    std::string mode = argv[1];
+    std::string filename;
+
+    if (argc == 4) {
         if (std::string(argv[2]) == "-v") {
             verbose = true;
+            filename = argv[3];
         } else {
             std::cerr << "Invalid option: " << argv[2] << std::endl;
             return 1;
         }
+    } else {
+        filename = argv[2];
     }
 
-    std::ifstream file("params.bots");
+    std::ifstream file(filename);
     if (!file.is_open()) {
-        std::cerr << "Could not open params.bots file" << std::endl;
+        std::cerr << "Could not open file: " << filename << std::endl;
         return 1;
     }
 
     std::vector<HeuristicParameters> agentsParams;
     for (int i = 0; i < NUM_PLAYERS; ++i) {
         if (file.eof()) {
-            std::cerr << "Not enough parameters in params.bots file" << std::endl;
+            std::cerr << "Not enough parameters in " << filename << std::endl;
             return 1;
         }
         agentsParams.push_back(readParams(file));
     }
     file.close();
 
-    if (std::string(argv[1]) == "-b") {
+    if (mode == "-b") {
         playGameBenchmark(NUM_GAMES, verbose, agentsParams);
-    } else if (std::string(argv[1]) == "-s") {
+    } else if (mode == "-s") {
         playGameShowdown(NUM_GAMES, verbose, agentsParams);
-    } else if (std::string(argv[1]) == "-r") {
+    } else if (mode == "-r") {
         playGameRandom(NUM_GAMES, verbose);
-    } else if (std::string(argv[1]) == "-e") {
-        evaluateParameterSets(10);
+    } else if (mode == "-e") {
+        evaluateParameterSets(50);
     } else {
-        std::cerr << "Invalid option: " << argv[1] << std::endl;
+        std::cerr << "Invalid option: " << mode << std::endl;
         return 1;
     }
 
