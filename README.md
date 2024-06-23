@@ -1,34 +1,39 @@
 # PokerBot
+
 Bot playing five-card draw poker game made as a project for Artificial Intelligence
 
 ## Usage:
 
 **Compile with:**
 
-$ g++ -O2 -o bot.o bot.cpp
-or
-$ g++ -Os -o bot.o bot.cpp
+```sh
+$ make
+```
 
-**Run ./bot.o [mode flag] [verbose flag (optional)]**
+**Run:**
 
-**modes:**
--r - completely random 10000 games
--b - benchmark for MCTS heurestics (will benchmark all Agents in params.bots)
--s - showdown (5 agents from the top of params.bots competing against each other)
+```sh
+$ ./bot [mode flag] [verbose flag (optional)]
+```
 
-**verbose flag -v will show you game state move by move**
+**Modes:**
+- `-r` - completely random 10000 games
+- `-b` - benchmark for MCTS heuristics (will benchmark all Agents in `params.bots`)
+- `-s` - showdown (5 agents from the top of `params.bots` competing against each other)
+- `-e` - evaluate 3 ^ 7 different heuristics (deprecated)
 
-**params.bots required format:**
- - Agent name
- - exploration constant
- - draw bias for low-value hands
- - draw bias for high-value hands
- - call bias multiplier (* hand value)
- - raise bias multiplier (* hand value)
- - hand strenght weight (additional multiplier for hand value)
- - bankroll weight (how much influence does already bet cash have)
- - hand strength weights HIGH_CARD [val] PAIR [val] TWO_PAIR [val] THREE_KIND [val] STRAIGHT [val] FLUSH [val] FULL_HOUSE [val] FOUR_KIND [val] STRAIGHT_FLUSH [val] ROYAL_FLUSH [val]
+**Verbose flag `-v` will show you game states move by move**
+
+**Required `params.bots` format:**
+- Agent name
+- Exploration constant
+- Draw bias for low-value hands
+- Draw bias for high-value hands
+- Call bias multiplier (* hand value)
+- Raise bias multiplier (* hand value)
+- Hand strength weight (additional multiplier for hand value)
+- Bankroll weight (how much influence does already bet cash have)
+- Hand strength weights: `HIGH_CARD [val] PAIR [val] TWO_PAIR [val] THREE_KIND [val] STRAIGHT [val] FLUSH [val] FULL_HOUSE [val] FOUR_KIND [val] STRAIGHT_FLUSH [val] ROYAL_FLUSH [val]`
 
 ### Worth noting:
-This is by no means a ready solution for gambling and I strongly advise against using it.
-Provided agents parameters are just for an overview and further testing is required for them to become useful.
+This is by no means a ready solution for gambling and I strongly advise against using it. Provided agents' parameters are just for an overview and further testing is required for them to become useful.
