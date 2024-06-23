@@ -962,9 +962,10 @@ HeuristicParameters readParams(std::ifstream& file) {
     return HeuristicParameters(ec, dbl, dbh, cb, rb, hsw, bw, hswMap);
 }
 
+
 int main(int argc, char* argv[]) {
     if (argc < 3 || argc > 4) {
-        std::cerr << "Usage: " << argv[0] << " -b|-s|-r [-v] <filename>" << std::endl;
+        std::cerr << "Usage: " << argv[0] << " -b|-s|-r|-e [-v] <filename>" << std::endl;
         return 1;
     }
 
@@ -991,14 +992,15 @@ int main(int argc, char* argv[]) {
     }
 
     std::vector<HeuristicParameters> agentsParams;
-    for (int i = 0; i < NUM_PLAYERS; ++i) {
-        if (file.eof()) {
-            std::cerr << "Not enough parameters in " << filename << std::endl;
-            return 1;
-        }
+    while (!file.eof()) {
         agentsParams.push_back(readParams(file));
     }
     file.close();
+
+    if (static_cast<int>(agentsParams.size()) < NUM_PLAYERS) {
+        std::cerr << "Not enough parameters in " << filename << ". At least " << NUM_PLAYERS << " required." << std::endl;
+        return 1;
+    }
 
     if (mode == "-b") {
         playGameBenchmark(NUM_GAMES, verbose, agentsParams);
