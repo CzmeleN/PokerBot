@@ -408,6 +408,12 @@ struct Node {
     int wins, visits;
 
     Node(GameState s, Node* p = nullptr, Move m = Move()) : state(s), parent(p), move(m), wins(0), visits(0) {}
+
+    ~Node() {
+        for (auto child: children) {
+            delete child;
+        }
+    }
 };
 
 struct HeuristicParameters {
