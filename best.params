@@ -1,0 +1,50 @@
+# Agent a103
+explorationConstant 0.95
+drawBiasLow 1.0
+drawBiasHigh 0.55
+callBiasBase 4.25
+raiseBiasBase 5.0
+handStrengthWeight 1.4
+bankrollWeight 0.9
+handStrengthWeights HIGH_CARD 0.1 PAIR 0.2 TWO_PAIR 0.4 THREE_KIND 0.6 STRAIGHT 0.8 FLUSH 1.0 FULL_HOUSE 1.2 FOUR_KIND 1.4 STRAIGHT_FLUSH 1.6 ROYAL_FLUSH 2.0 
+
+# Agent a42
+explorationConstant 0.9
+drawBiasLow 1.0
+drawBiasHigh 0.55
+callBiasBase 4.75
+raiseBiasBase 4.25
+handStrengthWeight 1.2
+bankrollWeight 1.4
+handStrengthWeights HIGH_CARD 0.1 PAIR 0.2 TWO_PAIR 0.4 THREE_KIND 0.6 STRAIGHT 0.8 FLUSH 1.0 FULL_HOUSE 1.2 FOUR_KIND 1.4 STRAIGHT_FLUSH 1.6 ROYAL_FLUSH 2.0 
+
+# Agent a41
+explorationConstant 0.9
+drawBiasLow 1.0
+drawBiasHigh 0.55
+callBiasBase 4.75
+raiseBiasBase 4.25
+handStrengthWeight 1.2
+bankrollWeight 0.9
+handStrengthWeights HIGH_CARD 0.1 PAIR 0.2 TWO_PAIR 0.4 THREE_KIND 0.6 STRAIGHT 0.8 FLUSH 1.0 FULL_HOUSE 1.2 FOUR_KIND 1.4 STRAIGHT_FLUSH 1.6 ROYAL_FLUSH 2.0 
+
+# Agent a39
+explorationConstant 0.9
+drawBiasLow 1.0
+drawBiasHigh 0.55
+callBiasBase 4.25
+raiseBiasBase 5.0
+handStrengthWeight 1.4
+bankrollWeight 0.9
+handStrengthWeights HIGH_CARD 0.1 PAIR 0.2 TWO_PAIR 0.4 THREE_KIND 0.6 STRAIGHT 0.8 FLUSH 1.0 FULL_HOUSE 1.2 FOUR_KIND 1.4 STRAIGHT_FLUSH 1.6 ROYAL_FLUSH 2.0 
+
+# Agent a92
+explorationConstant 0.95
+drawBiasLow 0.95
+drawBiasHigh 0.85
+callBiasBase 4.75
+raiseBiasBase 4.25
+handStrengthWeight 1.4
+bankrollWeight 1.4
+handStrengthWeights HIGH_CARD 0.1 PAIR 0.2 TWO_PAIR 0.4 THREE_KIND 0.6 STRAIGHT 0.8 FLUSH 1.0 FULL_HOUSE 1.2 FOUR_KIND 1.4 STRAIGHT_FLUSH 1.6 ROYAL_FLUSH 2.0 
+

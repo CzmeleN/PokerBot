@@ -751,7 +751,7 @@ void playGameBenchmark(int numGames, bool verbose, const std::vector<HeuristicPa
         {0.1, 0.3, 0.4, 0.2, 0.2}  
     };
 
-    for (int id = 0; id < static_cast<int>(agentsParams.size()); ++id) {
+    for (int id = 0; id < static_cast<int>(agentsParams.size()); id++) {
         std::vector<int> wallets(NUM_PLAYERS, numGames * MAX_BET / CASH_FACTOR);
         std::vector<int> botPositions = {0, 1, 2, 3, 4};
         std::random_device rd;
@@ -852,7 +852,7 @@ void evaluateParameterSets(int numGames) {
     playGameBenchmark(numGames, false, parameterSets);
 }
 
-void playGameShowdown(int numGames, bool verbose, const std::vector<HeuristicParameters>& agentsParams) {
+int playGameShowdown(int numGames, bool verbose, const std::vector<HeuristicParameters>& agentsParams) {
     std::vector<int> wallets(NUM_PLAYERS, numGames * MAX_BET / CASH_FACTOR);
     int max = 0, max_cash = -1;
 
@@ -882,10 +882,14 @@ void playGameShowdown(int numGames, bool verbose, const std::vector<HeuristicPar
 
         while (!initialState.isTerminal()) {
             int currentPlayer = initialState.getCurrentPlayer();
-            mctsBots[botPositions[currentPlayer]].setGameState(initialState);
-            mctsBots[botPositions[currentPlayer]].runSearch(MCTS_ITERATIONS);
-            Move bestMove = mctsBots[botPositions[currentPlayer]].getBestMove();
-            initialState.applyMove(bestMove);
+            for (int i = 0; i < NUM_GAMES; i++) {
+                if (botPositions[i] == currentPlayer) {
+                    mctsBots[i].setGameState(initialState);
+                    mctsBots[i].runSearch(MCTS_ITERATIONS);
+                    initialState.applyMove(mctsBots[i].getBestMove());
+                    break;
+                }
+            }
         }
 
         initialState.updateWallets();
@@ -898,12 +902,12 @@ void playGameShowdown(int numGames, bool verbose, const std::vector<HeuristicPar
         auto winners = initialState.getResult();
         std::cout << std::endl << "󰠰 Game " << game + 1 << " 󰡶 Winners: ";
         for (int winner : winners) {
-            std::cout << winner << " ";
+            std::cout << winner + 1 << " ";
         }
         std::cout << std::endl;
 
         for (int i = 0; i < NUM_PLAYERS; ++i) {
-            std::cout << "Agent 󱚝 A" << botPositions[i] + 1 << " (Position " << botPositions[i] + 1 << ") wallet: " << wallets[botPositions[i]] << " 󰄔 " << std::endl;
+            std::cout << "Agent 󱚝 A" << i + 1 << " (Position " << botPositions[i] + 1 << ") wallet: " << wallets[i] << " 󰄔 " << std::endl;
         }
     }
 
@@ -914,7 +918,47 @@ void playGameShowdown(int numGames, bool verbose, const std::vector<HeuristicPar
         }
     }
 
-    std::cout << std::endl << " Overall winner: Agent 󱚝 A" << max + 1 << std::endl;
+    return max;
+}
+
+void playTournament(int numGames, bool verbose, std::vector<HeuristicParameters>& agentsParams) {
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::vector<int> originalIndices(agentsParams.size());
+    for (size_t i = 0; i < agentsParams.size(); ++i) {
+        originalIndices[i] = i;
+    }
+
+    while (agentsParams.size() > 1) {
+        std::vector<HeuristicParameters> nextRoundParams;
+        std::vector<int> nextRoundIndices;
+        std::shuffle(agentsParams.begin(), agentsParams.end(), gen);
+        std::shuffle(originalIndices.begin(), originalIndices.end(), gen);
+
+        for (size_t i = 0; i < agentsParams.size(); i += NUM_PLAYERS) {
+            std::vector<HeuristicParameters> group;
+            std::vector<int> groupIndices;
+            for (size_t j = i; j < i + NUM_PLAYERS && j < agentsParams.size(); ++j) {
+                group.push_back(agentsParams[j]);
+                groupIndices.push_back(originalIndices[j]);
+            }
+            if (group.size() < NUM_PLAYERS) {
+                nextRoundParams.push_back(group[0]);
+                nextRoundIndices.push_back(groupIndices[0]);
+                continue;
+            }
+
+            int winner = playGameShowdown(numGames, verbose, group);
+            nextRoundParams.push_back(group[winner]);
+            nextRoundIndices.push_back(groupIndices[winner]);
+
+            std::cout << "󰔺 Winner of this round: Agent 󱚝 A" << groupIndices[winner] << std::endl;
+        }
+        agentsParams = nextRoundParams;
+        originalIndices = nextRoundIndices;
+    }
+
+    std::cout << std::endl << "󰔸 󰔸 󰔸 Tournament winner: Agent " << originalIndices[0] << std::endl << std::endl;
 }
 
 HeuristicParameters readParams(std::ifstream& file) {
@@ -962,7 +1006,6 @@ HeuristicParameters readParams(std::ifstream& file) {
     return HeuristicParameters(ec, dbl, dbh, cb, rb, hsw, bw, hswMap);
 }
 
-
 int main(int argc, char* argv[]) {
     if (argc < 3 || argc > 4) {
         std::cerr << "Usage: " << argv[0] << " -b|-s|-r|-e [-v] <filename>" << std::endl;
@@ -995,6 +1038,7 @@ int main(int argc, char* argv[]) {
     while (!file.eof()) {
         agentsParams.push_back(readParams(file));
     }
+    agentsParams.pop_back();
     file.close();
 
     if (static_cast<int>(agentsParams.size()) < NUM_PLAYERS) {
@@ -1004,8 +1048,8 @@ int main(int argc, char* argv[]) {
 
     if (mode == "-b") {
         playGameBenchmark(NUM_GAMES, verbose, agentsParams);
-    } else if (mode == "-s") {
-        playGameShowdown(NUM_GAMES, verbose, agentsParams);
+    } else if (mode == "-t") {
+        playTournament(NUM_GAMES, verbose, agentsParams);
     } else if (mode == "-r") {
         playGameRandom(NUM_GAMES, verbose);
     } else if (mode == "-e") {
