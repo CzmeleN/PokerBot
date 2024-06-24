@@ -35,37 +35,37 @@ Parametry te są opisane w pliku `README.md`.
 ## Zmiany w parametrach i ich zakresy
 
 ### Exploration Constant (0.5 - 1.5, 0.1 inc)
-![ec](ec_graph.png)
+![ec](images/ec_graph.png)
 
 Wykres przyjmuje trend odwróconego U. Dzieje się tak, ponieważ wartości bliskie 1 dają dobry balans pomiędzy eksploracją a rozwijaniem już znanych węzłów. Widzimy także duże wachania przy wyższych wartościach, zapewne wynika to z tego, że przypada wtedy mniej symulacji na węzeł, więc wyniki są mniej miarodajne.
 
 ### Draw Bias (low) (0.1 - 1.0, 0.05 inc)
-![db_low](db_low_graph.png)
+![db_low](images/dblow_graph.png)
 
 Wykres ma trend wzrostowy. Wymiana kart, gdy mamy co najwyżej parę, jest praktycznie zawsze opłacalna, a MCTS wybiera, które karty chce wymienić.
 
 ### Draw Bias (high) (0.1 - 1.0, 0.05 inc)
-![db_high](db_high_graph.png)
+![db_high](images/dbhigh_graph.png)
 
 Wykres nie przyjmuje żadnego trendu lub przyjmuje U. Wymiana kart, gdy mamy silniejsze ręce, wiąże się z większym ryzykiem. Możliwe, że ilość testów była za mała, aby otrzymać bardziej miarodajne wyniki. Spodziewałem się, że trend będzie spadkowy.
 
 ### Call Bias (0.5 - 5.0, 0.25 inc)
-![cb](cb_graph.png)
+![cb](images/cb_graph.png)
 
 Wykres przyjmuje trend wzrostowy. Można było się tego spodziewać, gdyż spasowanie na start oznacza stratę, więc agresywność jest dodatkowo nagradzana. Wachania przy niższych wartościach zapewne wynikają z tego, że czasem nie trafiała się dobra ręka, aby mógł obstawić.
 
 ### Raise Bias (0.5 - 5.0, 0.25 inc)
-![rb](rb_graph.png)
+![rb](images/rb_graph.png)
 
 Wykres również przyjmuje, tym razem bardziej wyraźny, trend wzrostowy. Pewność siebie daje botom dodatkową szansę na zarobek. Jeśli więcej calli jest zamieniane na raisy, boty są w stanie zazwyczaj bezboleśnie (jeśli mają odpowiednio silną rękę) wyciągnąć bonus.
 
 ### Hand Strength Weight (0.5 - 1.5, 0.1 inc)
-![hsw](hsw_graph.png)
+![hsw](images/hsw_graph.png)
 
 Tutaj trend jest wzrostowy, bądź wykres jest losowy. Na dobrą sprawę ta zmienna wydaje mi się bezużyteczna, ponieważ możemy bezpośrednio edytować wartości dla danych rąk, a samo mnożenie ich wszystkich zarazem, dopóki są odpowiednio dobrane, nie robi większego znaczenia.
 
 ### Bankroll Weight (0.5 - 1.5, 0.1 inc)
-![bw](bw_graph.png)
+![bw](images/bw_graph.png)
 
 Nazwa trochę nieadekwatna, a mianowicie wartość mówi nam, jak bardzo bot jest skłonny do dalszego callowania/raisowania w zależności od tego, ile obstawił, a nie tego, ile ogólnie jest na +. Wykres ma trend wzrostowy, gdyż wysokie wartości sprawiają, że bot nie odpuszcza po obstawieniu dużej kwoty. Natomiast dawało to szansę agresywnemu-podbijającemu botowi na niektóre szczęśliwe wygrane, gdy nasz bot za bardzo sugerował się tym, ile już obstawił. Sprawiało to również, że dużo gier między botami z wysoką wartością kończyło się na maksymalnym becie.
 
@@ -79,7 +79,7 @@ Następnym etapem testowania było wyłonienie najlepszych zestawów parametrów
 
 Wyniki turnieju są widoczne na poniższym screenie (przepisywałem je ręcznie do arkusza):
 
-![tournament](tournament.png)
+![tournament](images/tournament.png)
 
 Wszystkie parametry zapisane są w pliku `tournament.params`, a najlepsze z nich w `best.params`.
 
